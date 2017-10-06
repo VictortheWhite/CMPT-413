@@ -13,31 +13,32 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("-c", "--unigramcounts", dest='counts1w', type=str, default=os.path.join('data', 'count_1w.txt'), help="unigram counts")
 argparser.add_argument("-b", "--bigramcounts", dest='counts2w', type=str, default=os.path.join('data', 'count_2w.txt'), help="bigram counts")
 argparser.add_argument("-i", "--inputfile", dest="input", type=str, default=os.path.join('data', 'input'), help="input file to segment")
+argparser.add_argument("-l", "--log", dest='enable_log', type=bool, default=False)
 args = argparser.parse_args()
 
 class ProbDist(dict):
     """A probability distribution estimated from counts in datafile."""
-    def __init__(self, filename, sep='\t', N=None, missingfn=None):
+    def __init__(self, filename, sep='\t', totalvalue=None, missingfn=None):
         self.maxlen = 0
         for line in open(filename):
             (key, freq) = line.split(sep)
             self[key] = self.get(key, 0) + int(freq)
             self.maxlen = max(len(key), self.maxlen)
-        self.N = float(N or sum(self.values()))
-        self.missingfn = missingfn or (lambda k, N: 1./N)
+        self.totalvalue = float(totalvalue or sum(self.values()))
+        self.missingfn = missingfn or (lambda k, n: 1./n)
 
     def __call__(self, key):
         if key in self:
-            return float(self[key])/float(self.N)
+            return float(self[key])/float(self.totalvalue)
         else:
-            return self.missingfn(key, self.N)
+            return self.missingfn(key, self.totalvalue)
 
     def log_prob(self, key):
         """Return log probability for this key"""
-        return math.log(self.get(key, 0))
+        return math.log(self(key))
 
 class Entry(object):
-    """Entry for heap"""
+    """Entry that stored in heap"""
     def __init__(self, word, start_position, log_prob, back_pointer):
         self.word = word
         self.start_position = start_position
@@ -46,15 +47,6 @@ class Entry(object):
 
     def __lt__(self, other):
         return self.start_position < other.start_position
-
-    def __le__(self, other):
-        return self.start_position <= other.start_position
-
-    def __gt__(self, other):
-        return self.start_position > other.start_position
-
-    def __ge__(self, other):
-        return self.start_position >= other.start_position
 
 # the default segmenter does not use any probabilities, but you could ...
 prob_dist = ProbDist(args.counts1w)
@@ -66,7 +58,8 @@ with open(args.input) as f:
 
         # init input words list
         input_words = [i for i in line]
-        # print("==> Input words: ", input_words, len(input_words))
+        if args.enable_log:
+            print("==> Input words: ", input_words, len(input_words))
 
         # the dynamic programming table to store the argmax for every prefix of input
         chart = {}
@@ -77,18 +70,20 @@ with open(args.input) as f:
         for word in prob_dist:
             if line.startswith(word):
                 heap.put(Entry(word, 0, prob_dist.log_prob(word), None))
-                # print("==> put entry: ", (word, 0, prob_dist.log_prob(word), None))
                 missing = False
+                if args.enable_log:
+                    print("==> put entry: ", (word, 0, prob_dist.log_prob(word), None))
         if missing:
-            new_entry = Entry(line[0], 0, prob_dist.log_prob(word), entry)
-            # if new_entry not in list(heap):
-            # print("==> put entry: ", (line[0], 0, prob_dist.log_prob(word), entry))
+            new_entry = Entry(line[0], 0, prob_dist.log_prob(word), None)
             heap.put(new_entry)
+            if args.enable_log:
+                print("==> put entry: ", (line[0], 0, prob_dist.log_prob(word), None))
 
         # iteratively fill in chart[i] for all i
         while not heap.empty():
             entry = heap.get()
-            # print("==> test entry: ", (entry.word, entry.start_position, entry.log_prob, entry.back_pointer))
+            if args.enable_log:
+                print("==> get entry: ", (entry.word, entry.start_position, entry.log_prob, entry.back_pointer))
             end_position = entry.start_position + len(entry.word) - 1
             if end_position in chart and entry.log_prob <= chart[end_position].log_prob:
                 continue
@@ -100,17 +95,18 @@ with open(args.input) as f:
                 for word in prob_dist:
                     if line[next_start_position:].startswith(word):
                         new_entry = Entry(word, next_start_position, prob_dist.log_prob(word), entry)
-                        # if new_entry not in list(heap):
-                        # print("==> put entry: ", (word, next_start_position, prob_dist.log_prob(word), entry))
                         heap.put(new_entry)
                         missing = False
+                        if args.enable_log:
+                            print("==> put entry: ", (word, next_start_position, prob_dist.log_prob(word), entry))
                 if missing:
                     new_entry = Entry(line[next_start_position], next_start_position, prob_dist.log_prob(word), entry)
-                    # if new_entry not in list(heap):
-                    # print("==> put entry: ", (line[next_start_position], next_start_position, prob_dist.log_prob(word), entry))
                     heap.put(new_entry)
+                    if args.enable_log:
+                        print("==> put entry: ", (line[next_start_position], next_start_position, prob_dist.log_prob(word), entry))
 
-        # print("==> Chart: ", chart)
+        if args.enable_log:
+            print("==> Chart: ", chart)
 
         # get the best segmentation
         segmentation = []
