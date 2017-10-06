@@ -13,25 +13,23 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("-c", "--unigramcounts", dest='counts1w', type=str, default=os.path.join('data', 'count_1w.txt'), help="unigram counts")
 argparser.add_argument("-b", "--bigramcounts", dest='counts2w', type=str, default=os.path.join('data', 'count_2w.txt'), help="bigram counts")
 argparser.add_argument("-i", "--inputfile", dest="input", type=str, default=os.path.join('data', 'input'), help="input file to segment")
+argparser.add_argument("-s", "--smooth", dest ='smooth', type=float, default=0.5)
 argparser.add_argument("-l", "--log", dest='enable_log', type=bool, default=False)
 args = argparser.parse_args()
 
 class ProbDist(dict):
     """A probability distribution estimated from counts in datafile."""
-    def __init__(self, filename, sep='\t', totalvalue=None, missingfn=None):
-        self.maxlen = 0
+    def __init__(self, filename, sep='\t', totalvalue=None, smoothingfn=None):
         for line in open(filename):
             (key, freq) = line.split(sep)
             self[key] = self.get(key, 0) + int(freq)
-            self.maxlen = max(len(key), self.maxlen)
         self.totalvalue = float(totalvalue or sum(self.values()))
-        self.missingfn = missingfn or (lambda k, n: 1./n)
+        self.totaltype = float(len(self))
+        self.smoothingfn = smoothingfn or (lambda prob, v, t: (prob + args.smooth) / (v + args.smooth * t))
 
     def __call__(self, key):
-        if key in self:
-            return float(self[key])/float(self.totalvalue)
-        else:
-            return self.missingfn(key, self.totalvalue)
+        prob = self.get(key, 0) # if missing, the prob will be 0
+        return self.smoothingfn(float(prob), self.totalvalue, self.totaltype)
 
     def log_prob(self, key):
         """Return log probability for this key"""
@@ -74,10 +72,10 @@ with open(args.input) as f:
                 if args.enable_log:
                     print("==> put entry: ", (word, 0, prob_dist.log_prob(word), None))
         if missing:
-            new_entry = Entry(line[0], 0, prob_dist.log_prob(word), None)
+            new_entry = Entry(line[0], 0, prob_dist.log_prob(line[0]), None)
             heap.put(new_entry)
             if args.enable_log:
-                print("==> put entry: ", (line[0], 0, prob_dist.log_prob(word), None))
+                print("==> put entry: ", (line[0], 0, prob_dist.log_prob(line[0]), None))
 
         # iteratively fill in chart[i] for all i
         while not heap.empty():
@@ -100,10 +98,10 @@ with open(args.input) as f:
                         if args.enable_log:
                             print("==> put entry: ", (word, next_start_position, prob_dist.log_prob(word), entry))
                 if missing:
-                    new_entry = Entry(line[next_start_position], next_start_position, prob_dist.log_prob(word), entry)
+                    new_entry = Entry(line[next_start_position], next_start_position, prob_dist.log_prob(line[next_start_position]), entry)
                     heap.put(new_entry)
                     if args.enable_log:
-                        print("==> put entry: ", (line[next_start_position], next_start_position, prob_dist.log_prob(word), entry))
+                        print("==> put entry: ", (line[next_start_position], next_start_position, prob_dist.log_prob(line[next_start_position]), entry))
 
         if args.enable_log:
             print("==> Chart: ", chart)
