@@ -2,3 +2,4 @@ output
 baseline.py
 norvig-segment.py
 source.zip
+data/wseg_simplified_cn.txt

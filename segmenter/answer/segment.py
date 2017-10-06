@@ -2,27 +2,26 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sys
 import math
 import queue
-import codecs
 import argparse
 
 # arguments
 argparser = argparse.ArgumentParser()
-argparser.add_argument("-c", "--unigramcounts", dest='counts1w', type=str, default=os.path.join('data', 'count_1w.txt'), help="unigram counts")
-argparser.add_argument("-b", "--bigramcounts", dest='counts2w', type=str, default=os.path.join('data', 'count_2w.txt'), help="bigram counts")
+argparser.add_argument("-c", "--unigramcounts", dest='counts1w', type=list, nargs='+', default=[os.path.join('data', 'count_1w.txt'), os.path.join('data', 'count_extra.txt')], help="unigram counts")
+argparser.add_argument("-b", "--bigramcounts", dest='counts2w', type=list, nargs='+', default=[os.path.join('data', 'count_2w.txt')], help="bigram counts")
 argparser.add_argument("-i", "--inputfile", dest="input", type=str, default=os.path.join('data', 'input'), help="input file to segment")
-argparser.add_argument("-s", "--smooth", dest ='smooth', type=float, default=0.5)
-argparser.add_argument("-l", "--log", dest='enable_log', type=bool, default=False)
+argparser.add_argument("-s", "--smooth", dest ='smooth', type=float, default=0.5, help="smoothing parameter")
+argparser.add_argument("-l", "--log", dest='enable_log', type=bool, default=False, help="the flag that enable the log print")
 args = argparser.parse_args()
 
 class ProbDist(dict):
     """A probability distribution estimated from counts in datafile."""
-    def __init__(self, filename, sep='\t', totalvalue=None, smoothingfn=None):
-        for line in open(filename):
-            (key, freq) = line.split(sep)
-            self[key] = self.get(key, 0) + int(freq)
+    def __init__(self, filenames, sep='\t', totalvalue=None, smoothingfn=None):
+        for filename in filenames:
+            for line in open(filename, 'r'):
+                (key, freq) = line.split(sep)
+                self[key] = self.get(key, 0) + int(freq)
         self.totalvalue = float(totalvalue or sum(self.values()))
         self.totaltype = float(len(self))
         self.smoothingfn = smoothingfn or (lambda prob, v, t: (prob + args.smooth) / (v + args.smooth * t))
