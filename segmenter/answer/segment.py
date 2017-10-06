@@ -11,7 +11,7 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("-c", "--unigramcounts", dest='counts1w', type=list, nargs='+', default=[os.path.join('data', 'count_1w.txt'), os.path.join('data', 'count_extra.txt')], help="unigram counts")
 argparser.add_argument("-b", "--bigramcounts", dest='counts2w', type=list, nargs='+', default=[os.path.join('data', 'count_2w.txt')], help="bigram counts")
 argparser.add_argument("-i", "--inputfile", dest="input", type=str, default=os.path.join('data', 'input'), help="input file to segment")
-argparser.add_argument("-s", "--smooth", dest ='smooth', type=float, default=0.5, help="smoothing parameter")
+argparser.add_argument("-s", "--smooth", dest ='smooth', type=float, default=1.0, help="smoothing parameter")
 argparser.add_argument("-l", "--log", dest='enable_log', type=bool, default=False, help="the flag that enable the log print")
 args = argparser.parse_args()
 
