@@ -95,7 +95,7 @@ class Bigram(object):
         word_pair = word1 + ' ' + word2
         if word_pair in self.prob_dist2 and word1 in self.prob_dist:
             # Laplacian bigram probabilities
-            return math.log(self.prob_dist2.count(word_pair) / self.prob_dist.count(word1))
+            return math.log((self.prob_dist2.count(word_pair) + 1) / (self.prob_dist.count(word1) + self.prob_dist.totaltype))
         else:
             # Backoff
             return math.log(self.prob_dist(word2))
