@@ -13,8 +13,8 @@ argparser.add_argument("--bigramcounts", dest='counts2w', type=list, nargs='+', 
 argparser.add_argument("--inputfile", dest="input", type=str, default=os.path.join('data', 'input'), help="input file to segment")
 argparser.add_argument("--maxlen", dest ='maxlen', type=int, default=10, help="max possible length for each word")
 argparser.add_argument("--smooth", dest ='smooth', type=float, default=1.0, help="smoothing parameter")
-argparser.add_argument("--bigram", dest ='enable_bigram', type=bool, default=True, help="the flag that enable the bigram method")
-argparser.add_argument("--log", dest='enable_log', type=bool, default=False, help="the flag that enable the log print")
+argparser.add_argument("--bigram", dest ='enable_bigram', action='store_true', default=False, help="the flag that enable the bigram method")
+argparser.add_argument("--log", dest='enable_log', action='store_true', default=False, help="the flag that enable the log print")
 args = argparser.parse_args()
 
 
@@ -91,26 +91,43 @@ class Bigram(object):
         self.chart = {} # the dynamic programming table to store the argmax for every prefix of input
         self.chart[-1] = ("", 1.0) # initial state: empty string with probability 1.0
 
+    def get_probability(self, word1, word2):
+        word_pair = word1 + ' ' + word2
+        if word_pair in self.prob_dist2:
+            return self.prob_dist2.log_prob(word_pair)
+        else:
+            return self.prob_dist.log_prob(word2)
+
     def segment(self):
-        for i in range(len(self.input_words)):
+        for i in range(args.maxlen + 1):
+            word1 = "<S>"
+            word2 = "".join(self.input_words[:i+1])
+            prob = self.get_probability(word1, word2)
+            self.chart[i] = (word2, 1.0 + prob)
+
+        for i in range(1, len(self.input_words)):
             for j in range(1, args.maxlen + 1):
                 if i - j + 1 < 0:
                     continue
-                word = "".join(self.input_words[i-j+1:i+1])
-                prob = self.prob_dist.log_prob(word)
-                _, prev_prob = self.chart[i - j]
-                if args.enable_log:
-                    print("==> Check: ", i, j, word, prob, prev_prob)
-                if i not in self.chart:
-                    self.chart[i] = (word, prev_prob + prob)
+                for k in range(1, args.maxlen + 1):
+                    if i - j - k + 1 < 0:
+                        continue
+                    word1 = "".join(self.input_words[i-j-k+1:i-j+1])
+                    word2 = "".join(self.input_words[i-j+1:i+1])
+                    prob = self.get_probability(word1, word2)
+                    _, prev_prob = self.chart[i - j - k]
                     if args.enable_log:
-                        print("==> New: ", i, word, prev_prob + prob)
-                else:
-                    _, best_prob = self.chart[i]
-                    if prev_prob + prob > best_prob:
-                        self.chart[i] = (word, prev_prob + prob)
+                        print("==> Check: ", i, j, k, word1, word2, prob, prev_prob)
+                    if i not in self.chart:
+                        self.chart[i] = (word2, prev_prob + prob)
                         if args.enable_log:
-                            print("==> Update: ", i, word, prev_prob + prob)
+                            print("==> New: ", i, word2, prev_prob + prob)
+                    else:
+                        _, best_prob = self.chart[i]
+                        if prev_prob + prob > best_prob:
+                            self.chart[i] = (word2, prev_prob + prob)
+                            if args.enable_log:
+                                print("==> Update: ", i, word2, prev_prob + prob)
 
         # get the best segmentation
         index = len(self.input_words) - 1
@@ -125,7 +142,7 @@ class Bigram(object):
 
 # the default segmenter does not use any probabilities, but you could ...
 prob_dist = ProbDist(args.counts1w)
-prob_dist2 = {}
+prob_dist2 = ProbDist(args.counts2w)
 
 # handle each line in input
 with open(args.input) as f:
@@ -137,11 +154,11 @@ with open(args.input) as f:
         if args.enable_log:
             print("==> Input words: ", input_words, len(input_words))
 
-        if not args.enable_bigram:
-            # the unigram method
-            unigram = Unigram(input_words, prob_dist)
-            unigram.segment()
-        else:
+        if args.enable_bigram:
             # the bigram method
             bigram = Bigram(input_words, prob_dist, prob_dist2)
             bigram.segment()
+        else:
+            # the unigram method
+            unigram = Unigram(input_words, prob_dist)
+            unigram.segment()
