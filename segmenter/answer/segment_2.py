@@ -47,30 +47,6 @@ class Unigram(object):
         def __lt__(self, other):
             return self.endIndex < other.endIndex
 
-    def __getSubSequentEntries(self, scentence ,entry):
-        """get all entries for each word matches scentence at position entry.start"""
-        #print "new entry: ", entry.word
-        entries = []
-        maxLenOfSegment = 10
-        i = entry.endIndex
-        wordLen = 0
-        word = ""
-        while wordLen <= maxLenOfSegment and i < len(scentence):
-            #print i, wordLen, len(scentence)
-            word = "".join(scentence[entry.endIndex:i])
-            #print word, self.probDict(word)
-            if self.probDict(word):
-                newEntry = self.Entry(word, i, entry.logProb+math.log(self.probDict(word)), entry)
-                entries.append(newEntry)
-            wordLen += 1
-            i += 1
-        word = "".join(scentence[entry.endIndex:i])
-        #print word, self.probDict(word)
-        if self.probDict(word):
-            newEntry = self.Entry(word, i, entry.logProb+math.log(self.probDict(word)), entry)
-            entries.append(newEntry)
-        return entries
-
     def segment(self, scentence):
         chart = [None] * (len(scentence)+1)
         startEntry = self.Entry(None, 0, 0, None)
@@ -96,39 +72,19 @@ class Unigram(object):
         return output
 
 
-    """
+class Bigram(object):
+    """Bigram Segementer"""
+    def __init__(self, probDict_U, probDict_B):
+        self.probDict_U = probDict_U
+        self.probDict_B = probDict_B
+
     def segment(self, scentence):
-        chart = [None]*(len(scentence)+1)            # dp table for argmax of each prefix
-        heap = []                             # a queue containing entries to be expanded
 
-        startEntry = self.Entry(None, 0, 0, None)
-        heapq.heappush(heap, startEntry)
 
-        while heap:
-            e = heapq.heappop(heap)
-            print e.endIndex
-            #print e.endIndex
-            if e.endIndex >= 0:
-                #print e.endIndex, chart[e.endIndex]
-                if chart[e.endIndex]:
-                    if e.logProb > chart[e.endIndex].logProb:
-                        chart[e.endIndex] = e
-                else:
-                    chart[e.endIndex] = e
 
-            for newEntry in self.__getSubSequentEntries(scentence, e):
-                heapq.heappush(heap, newEntry)
+        output = []
+        return output
 
-        # get the best segmentation
-        res = []
-        entry = chart[-1];
-        while entry:
-            if entry.word:
-                res.append(entry.word)
-            entry = entry.lastEntry
-        res.reverse()
-        return res
-    """
 
 
 if __name__ == '__main__':
@@ -137,15 +93,7 @@ if __name__ == '__main__':
     Pw2 = Pdist(opts.counts2w)
 
     ugram = Unigram(Pw1)
-
-    """
-    with open(opts.input) as f:
-        for line in f:
-            scentence = line.strip().split()
-            output = ugram.segment(scentence)
-            print " ".join(output)
-    """
-
+    
     old = sys.stdout
     sys.stdout = codecs.lookup('utf-8')[-1](sys.stdout)
     # ignoring the dictionary provided in opts.counts

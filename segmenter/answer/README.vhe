@@ -1,0 +1,7 @@
+* I implemented the unigram algorithm, which didn't beaten Chong's. Thus it is aborted.
+* Wrote documentation
+* Accmmodate our solution to cisl linux environment
+
+
+* note:
+    * The code I wrote is in the repo but not in the source.zip we submitted, because it's not our final solution
