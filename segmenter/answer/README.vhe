@@ -1,6 +1,7 @@
-* I implemented the unigram algorithm, which didn't beaten Chong's. Thus it is aborted.
+* I implemented the baseline, but finds it really slow.
+* I implemented the unigram algorithm, using dynamic programming, which didn't beaten Chong's. Thus it is aborted.
 * Wrote documentation
-* Accmmodate our solution to cisl linux environment
+* Project wrap up and testing
 
 
 * note:
