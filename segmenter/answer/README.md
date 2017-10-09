@@ -2,7 +2,7 @@
 
 * In this assignment, 2 models are implemented: unigram and bigram
 * This program is written in Python3, please use Python3 to run it
-* Unigram is used by default, to use Unigram, run "Python3 answer/segment.py --bigram True"
+* Unigram is used by default, to use Unigram, run "Python3 answer/segment.py --unigram"
 
 ## Unigram
  * Unigram possibility of a segmentation is defined as:
@@ -50,6 +50,6 @@
                 score = score / (args.smooth * i * self.totalvalue)
             return score + 1e-200 # avoid log(0)
     ```
-    
+
     * The idea of this smoothing function is that, when an unknown word appears, the longer it is, the possibility of it should fall quickly
     * an arg is used to control the speed that it falls.

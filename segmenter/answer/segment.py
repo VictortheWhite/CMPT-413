@@ -12,7 +12,7 @@ argparser.add_argument("--bigramcounts", dest='counts2w', type=list, nargs='+', 
 argparser.add_argument("--inputfile", dest="input", type=str, default=os.path.join('data', 'input'), help="input file to segment")
 argparser.add_argument("--maxlen", dest ='maxlen', type=int, default=10, help="max possible length for unknown word")
 argparser.add_argument("--smooth", dest ='smooth', type=float, default=0.0245, help="smoothing parameter")
-argparser.add_argument("--bigram", dest ='enable_bigram', action='store_true', default=True, help="the flag that enable the bigram method")
+argparser.add_argument("--unigram", dest ='enable_unigram', action='store_true', default=False, help="the flag that enable the unigram method")
 argparser.add_argument("--log", dest='enable_log', action='store_true', default=False, help="the flag that enable the log print")
 args = argparser.parse_args()
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
             if args.enable_log:
                 print("==> Input words: ", input_words, len(input_words))
 
-            if args.enable_bigram:
+            if not args.enable_unigram:
                 # the bigram method
                 bigram = Bigram(input_words, prob_dist, prob_dist2)
                 bigram.segment()
