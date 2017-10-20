@@ -33,29 +33,104 @@ import sys, optparse, os
 import copy
 from collections import defaultdict
 
+schema = {
+    'U00': [[-2, 0]],
+    'U01': [[-1, 0]],
+    'U02': [[0, 0]],
+    'U03': [[1, 0]],
+    'U04': [[2, 0]],
+    'U05': [[-1, 0], [0, 0]],
+    'U06': [[0, 0], [1, 0]],
+    'U10': [[-2, 1]],
+    'U11': [[-1, 1]],
+    'U12': [[0, 1]],
+    'U13': [[1, 1]],
+    'U14': [[2, 1]],
+    'U15': [[-2, 1], [-1, 1]],
+    'U16': [[-1, 1], [0, 1]],
+    'U17': [[0, 1], [1, 1]],
+    'U18': [[1, 1], [2, 1]],
+    'U20': [[-2, 1], [-1, 1], [0, 1]],
+    'U21': [[-1, 1], [0, 1], [1, 1]],
+    'U22': [[0, 1], [1, 1], [2, 1]],
+    'B': [],
+}
+
 def perc_train(train_data, tagset, numepochs):
     print len(train_data)
     feat_vec = defaultdict(int)
-    for i in range(len(train_data)):
-        feat_vec[i] = 0
     # insert your code here
     # please limit the number of iterations of training to n iterations
-    defaultTage = tagset[0]
+    defaultTag = tagset[0]
     for i in range(numepochs):
         print i
         k = 0
+        feat_index = 0
         for (labeled_list, feat_list) in train_data:
             if k % 100 == 0: print "     ", k
             k += 1
-            z = perc.perc_test(feat_vec, labeled_list, feat_list, tagset, defaultTage)
-            assert len(z) == len(labeled_list)
-            # update the weights if z[i] != t[i]
-            for j in range(len(z)):
-                t = labeled_list[j].strip().split()[2]
-                if t != z[i]:
-                    feat_vec[feat_list[j], t] = feat_vec.get((feat_list[j], t), 0) + 1;
-                    feat_vec[feat_list[j], z[i]] = feat_vec.get((feat_list[j], z[i]), 0) - 1;
+            z = perc.perc_test(feat_vec, labeled_list, feat_list, tagset, defaultTag)
+
+            # get the augmented labels and feats for the word
+            labels = copy.deepcopy(labeled_list)
+            (feat_index, feats) = perc.feats_for_word(feat_index, feat_list)
+            labels.insert(0, 'B_-1 B_-1 B_-1')
+            labels.insert(0, 'B_-2 B_-2 B_-2') # first two 'words' are B_-2 B_-1
+            labels.append('B_+1 B_+1 B_+1')
+            labels.append('B_+2 B_+2 B_+2')    # last two 'words' are B_+1 B_+2
+            z.insert(0, 'B_-1')
+            z.insert(0, 'B_-2')
+            z.append('B_+1')
+            z.append('B_+2')
+
+            # update weights when t != labels[j] 
+            N = len(labels)
+            for j in range(2, N-2):
+                t = labels[j].split()[2]
+                if t != z[j]:
+                    updateWeights(feat_vec, labels, z, j, feats)
     return feat_vec
+
+def updateWeights(feat_vec, labels, z, labelIndex, feats):
+    # check all feats
+    for feat in feats:
+        feat_name = feat.split(':')[0]
+        sch = schema[feat_name]
+        if len(sch) == 0:
+            # # Bigram feature
+            # feat_vec["B:"+z[labelIndex-1], z[labelIndex]] -= 1
+            # feat_vec["B:"+x(labels, labelIndex-1, 2), x(labels, labelIndex, 2)] += 1
+            feat_vec_update(feat_vec, ("B:"+z[labelIndex-1], z[labelIndex]), -1)
+            feat_vec_update(feat_vec, ("B:"+x(labels, labelIndex-1, 2), x(labels, labelIndex, 2)), 1)
+        else:
+            active = True
+            for i in range(len(sch)):
+                value = feat.split(':')[1].split('/')[i]
+                #print "test schma"
+                #print value, x(labels, labelIndex+sch[i][0], sch[i][1])
+                if x(labels, labelIndex+sch[i][0], sch[i][1]) != value:
+                    active = False
+                    break
+            if active:
+                # penalize
+                #feat_vec[feat, z[labelIndex]] -= 1
+                feat_vec_update(feat_vec, (feat, z[labelIndex]), -1)
+                # reward
+                #feat_vec[feat, x(labels, labelIndex, 2)] += 1
+                feat_vec_update(feat_vec, (feat, x(labels, labelIndex, 2)), 1)
+
+
+def x(labels, row, col):
+    return labels[row].split()[col]
+
+def feat_vec_update(feat_vec, key, adder):
+    # drop 0s to make the dict small
+    val = feat_vec[key]
+    if val + adder == 0:
+        del feat_vec[key]
+    else:
+        feat_vec[key] = val + adder
+
 
 
 if __name__ == '__main__':
@@ -72,6 +147,8 @@ if __name__ == '__main__':
     if opts.devmode:
         opts.trainfile = "data/train.dev"
         opts.featfile = "data/train.feats.dev"
+        opts.modelfile = "model"
+        opts.numepochs = 10
 
     # each element in the feat_vec dictionary is:
     # key=feature_id value=weight
