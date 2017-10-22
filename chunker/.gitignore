@@ -1,4 +1,8 @@
-default.model
 *.pyc
-output
+__pycache__/
+output/output**
+model/model**
 run.sh
+output
+data/default.model
+
