@@ -14,6 +14,7 @@ if __name__ == '__main__':
     argparser.add_argument("-e", "--english", dest="english", default="en", help="suffix of English (target language) filename (default=en)")
     argparser.add_argument("-f", "--french", dest="french", default="fr", help="suffix of French (source language) filename (default=fr)")
     argparser.add_argument("-s", "--smoothing", dest="smooth", default=0.01, type=float, help="add_n smoothing value")
+    argparser.add_argument("-S", "--Smoothing", dest="Smooth", default=0.01, type=float, help="add_n smoothing value for distortion")
     argparser.add_argument("-n", "--num_sentences", dest="num_sents", default=2**64, type=int, help="Number of sentences to use for training and alignment")
     argparser.add_argument("-i", "--num_iteration", dest="num_iter", default=5, type=int, help="Number of iteration/epoch number")
     args = argparser.parse_args()
@@ -39,37 +40,63 @@ if __name__ == '__main__':
             for e_j in set(e).union({None}):
                 t[(f_i, e_j)] = 1.0 / V
 
+    # calculate the length of all distortions
+    a_count = set()
+    for f, e in bitext:
+        I, J = len(f), len(e)
+        for i in range(I):
+            for j in range(-1, J):
+                a_count.add((j, i, I, J))
+    S = len(a_count)
+
+    # init a uniformly
+    a = defaultdict(float)
+    for j, i, I, J in a_count:
+        a[(j, i, I, J)] = 1.0 / S
+    print(V, S)
     # traning
-    for i in range(args.num_iter):
-        sys.stderr.write("Starting Iteration %d ...\n" % i)
-        expected_count_fe = defaultdict(float)
-        expected_count_e = defaultdict(float)
+    for k in range(args.num_iter):
+        sys.stderr.write("Starting Iteration %d ...\n" % k)
+        expected_count_t_fe = defaultdict(float)
+        expected_count_t_e = defaultdict(float)
+        expected_count_a_fe = defaultdict(float)
+        expected_count_a_e = defaultdict(float)
 
         for f, e in bitext:
-            for f_i in f:
+            I, J = len(f), len(e)
+            for i in range(I):
                 # calculate the normalization term
-                z = t[(f_i, None)]
-                for e_j in e:
-                    z += t[(f_i, e_j)]
+                z = t[(f[i], None)] * a[(-1, i, I, J)]
+                for j in range(J):
+                    z += t[(f[i], e[j])] * a[(j, i, I, J)]
                 # calculate expected count
-                for e_j in e:
-                    c = t[(f_i, e_j)] / z
-                    expected_count_fe[(f_i, e_j)] += c
-                    expected_count_e[e_j] += c
-                c = t[(f_i, None)] / z
-                expected_count_fe[(f_i, None)] += c
-                expected_count_e[None] += c
+                for j in range(J):
+                    c = t[(f[i], e[j])] * a[(j, i, I, J)] / z
+                    expected_count_t_fe[(f[i], e[j])] += c
+                    expected_count_t_e[e[j]] += c
+                    expected_count_a_fe[(j, i, I, J)] += c
+                    expected_count_a_e[(i, I, J)] += c
 
-        for f, e in expected_count_fe:
-            t[(f, e)] = (expected_count_fe[(f, e)] + args.smooth) / (expected_count_e[e] + args.smooth * V)
+                c = t[(f[i], None)] * a[(-1, i, I, J)] / z
+                expected_count_t_fe[(f_i, None)] += c
+                expected_count_t_e[None] += c
+                expected_count_a_fe[(-1, i, I, J)] += c
+                expected_count_a_e[(i, I, J)] += c
+        
+        # smoothing
+        for f, e in expected_count_t_fe:
+            t[(f, e)] = (expected_count_t_fe[(f, e)] + args.smooth) / (expected_count_t_e[e] + args.smooth * V)
+        for i, j, I, J in expected_count_a_fe:
+            a[(i, j, I, J)] = (expected_count_a_fe[(i, j, I, J)] + args.Smooth) / (expected_count_a_e[j, I, J] + args.Smooth * S)
 
     # align and output result
     for f, e in bitext:
+        I, J = len(f), len(e)
         for i, f_i in enumerate(f):
-            best_p = t[(f_i, None)]
+            best_p = t[(f_i, None)] * a[-1, i, I, J]
             best_j = -1
             for j, e_j in enumerate(e):
-                p = t[(f_i, e_j)]
+                p = t[(f_i, e_j)] * a[-1, i, I, J]
                 if p > best_p:
                     best_p = p
                     best_j = j
