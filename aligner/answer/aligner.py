@@ -40,8 +40,7 @@ def align(bitext):
     for f, e in count_ef:
         t[(f, e)] = count_ef[(f, e)] / (count_e[e] * count_f[f])
 
-    #V, S = 100000, 10000
-    V, S = len(t), len(a)
+    V, S = 100000, 10000
     # traning
     for T in range(args.num_iter):
         sys.stderr.write("Starting Iteration %d ...\n" % T)
