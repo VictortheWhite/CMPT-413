@@ -20,30 +20,28 @@ args = argparser.parse_args()
 
 def align(bitext):
     sys.stderr.write("Init parameters...\n")
-    t = defaultdict(float)
-    q = defaultdict(float)
 
     count_e = defaultdict(float)
     count_f = defaultdict(float)
     count_fe = defaultdict(float)
 
+    q = defaultdict(lambda: 1.0/15, {})
     for f, e in bitext:
         l, m = len(e), len(f)
-        for f_i in set(f):
-            count_f[f_i] += 1
-        for e_j in set(e).union({None}):
-            count_e[e_j] += 1
         for i, f_i in enumerate(f):
             for j, e_j in enumerate(e):
+                count_f[f_i] += 1
+                count_e[e_j] += 1
                 count_fe[(f_i, e_j)] += 1
                 q[(j, i, l, m)] = 1.0 / (l + 1)
+            count_e[None] += 1
             count_fe[(f_i, None)] += 1
             q[(None, i, l, m)] = 1.0 / (l + 1)
 
+    t = defaultdict(lambda: 1.0/len(count_f), {})
     for f, e in count_fe:
         t[(f, e)] = count_fe[(f, e)] / (count_e[e] * count_f[f])
 
-    sys.stderr.write("%d %d\n" % (len(count_f), len(count_e)))
     V_t, V_q = 100000, 10000
 
     # traning
@@ -104,8 +102,8 @@ if __name__ == '__main__':
     sys.stderr.write("Read data...\n")
     f_data = "%s.%s" % (os.path.join(args.datadir, args.fileprefix), args.french)
     e_data = "%s.%s" % (os.path.join(args.datadir, args.fileprefix), args.english)
-    bitext_1 = [[sentence.strip().split() for sentence in pair] for pair in list(zip(open(f_data), open(e_data)))[:args.num_sents]]
-    bitext_2 = [[sentence.strip().split() for sentence in pair] for pair in list(zip(open(e_data), open(f_data)))[:args.num_sents]]
+    bitext_1 = [[sentence.strip().split() for sentence in pair] for pair in list(zip(open(f_data, encoding='utf8'), open(e_data, encoding='utf8')))[:args.num_sents]]
+    bitext_2 = [[sentence.strip().split() for sentence in pair] for pair in list(zip(open(e_data, encoding='utf8'), open(f_data, encoding='utf8')))[:args.num_sents]]
 
     aligns_1 = align(bitext_1)
     aligns_2 = align(bitext_2)
