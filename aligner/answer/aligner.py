@@ -31,16 +31,17 @@ def align(bitext):
         J = len(e)
         for i, f_i in enumerate(f):
             for j, e_j in enumerate(e):
-                count_f[f_i] += 1
-                count_e[e_j] += 1
-                count_ef[(f_i, e_j)] += 1
-                a[j, i, I, J] = 1.0 / (J+1)
+                count_f[f_i] += 1.0
+                count_e[e_j] += 1.0
+                count_ef[(f_i, e_j)] += 1.0
+                a[(j, i, I, J)] = 1.0 / (J+1)
             a[-1, i, I, J] = 1.0 / (J+1)
-        t[f_i, None] = 1.0 / (I * J)
+        #t[f_i, None] = 1.0 / (I * J)
     for f, e in count_ef:
         t[(f, e)] = count_ef[(f, e)] / (count_e[e] * count_f[f])
 
-    V, S = 100000, 10000
+    #V, S = 100000, 10000
+    V, S = len(t), len(a)
     # traning
     for T in range(args.num_iter):
         sys.stderr.write("Starting Iteration %d ...\n" % T)
@@ -73,13 +74,15 @@ def align(bitext):
                 expected_count_a_e[(i, I, J)] += c
         
         # smoothing
+        sys.stderr.write("smoothing...\n")
         for f, e in expected_count_t_fe:
             t[(f, e)] = (expected_count_t_fe[(f, e)] + args.smooth) / (expected_count_t_e[e] + args.smooth * V)
         for i, j, I, J in expected_count_a_fe:
             a[(i, j, I, J)] = (expected_count_a_fe[(i, j, I, J)] + args.Smooth) / (expected_count_a_e[j, I, J] + args.Smooth * S)
     
-    alignments = []
     # align and output result
+    sys.stderr.write("aligning...\n")
+    alignments = []
     for f, e in bitext:
         I, J = len(f), len(e)
         alignments.append([])
@@ -87,14 +90,12 @@ def align(bitext):
             best_p = t[(f_i, None)] * a[-1, i, I, J]
             best_j = -1
             for j, e_j in enumerate(e):
-                p = t[(f_i, e_j)] * a[-1, i, I, J]
+                p = t[(f_i, e_j)] * a[j, i, I, J]
                 if p > best_p:
                     best_p = p
                     best_j = j
             if best_j >= 0:
                 alignments[-1].append((i, best_j))
-                #sys.stdout.write("%i-%i " % (i, best_j))
-        #sys.stdout.write("\n")
     return alignments
 
 
@@ -108,29 +109,12 @@ if __name__ == '__main__':
     aligns_1 = align(bitext)
     aligns_2 = align(bitext_2)
 
-    # output 2 intersection of alignments
+    # output intersection of 2 alignments
+    sys.stderr.write("intersecting aligns...\n")
     for k, a in enumerate(aligns_1):
         for i, j in a:
             if (j, i) in aligns_2[k]:
                 sys.stdout.write("%i-%i " % (i, j))
         sys.stdout.write("\n")
         
-
-    # # calculate V (length of f words)
-    # f_count = defaultdict(int)
-    # for f, e in bitext:
-    #     for f_i in set(f):
-    #         f_count[f_i] += 1
-    # V = len(f_count)
-
-    # # calculate the length of all distortions
-    # a_count = set()
-    # for f, e in bitext:
-    #     I, J = len(f), len(e)
-    #     for i in range(I):
-    #         for j in range(-1, J):
-    #             a_count.add((j, i, I, J))
-    # S = len(a_count)
-
-    # init t and a
     
