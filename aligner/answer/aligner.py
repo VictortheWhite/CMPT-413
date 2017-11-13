@@ -13,8 +13,8 @@ if __name__ == '__main__':
     argparser.add_argument("-p", "--prefix", dest="fileprefix", default="hansards", help="prefix of parallel data files (default=hansards)")
     argparser.add_argument("-e", "--english", dest="english", default="en", help="suffix of English (target language) filename (default=en)")
     argparser.add_argument("-f", "--french", dest="french", default="fr", help="suffix of French (source language) filename (default=fr)")
-    argparser.add_argument("-s", "--smoothing", dest="smooth", default=0.01, type=float, help="add_n smoothing value")
-    argparser.add_argument("-S", "--Smoothing", dest="Smooth", default=0.01, type=float, help="add_n smoothing value for distortion")
+    argparser.add_argument("-s", "--smoothing", dest="smooth", default=0.001, type=float, help="add_n smoothing value")
+    argparser.add_argument("-S", "--Smoothing", dest="Smooth", default=0.005, type=float, help="add_n smoothing value for distortion")
     argparser.add_argument("-n", "--num_sentences", dest="num_sents", default=2**64, type=int, help="Number of sentences to use for training and alignment")
     argparser.add_argument("-i", "--num_iteration", dest="num_iter", default=5, type=int, help="Number of iteration/epoch number")
     args = argparser.parse_args()
@@ -26,43 +26,55 @@ if __name__ == '__main__':
 
     sys.stderr.write("Init parameters...\n")
 
-    # calculate V (length of f words)
-    f_count = defaultdict(int)
-    for f, e in bitext:
-        for f_i in set(f):
-            f_count[f_i] += 1
-    V = len(f_count)
+    # # calculate V (length of f words)
+    # f_count = defaultdict(int)
+    # for f, e in bitext:
+    #     for f_i in set(f):
+    #         f_count[f_i] += 1
+    # V = len(f_count)
 
-    # init t uniformly
+    # # calculate the length of all distortions
+    # a_count = set()
+    # for f, e in bitext:
+    #     I, J = len(f), len(e)
+    #     for i in range(I):
+    #         for j in range(-1, J):
+    #             a_count.add((j, i, I, J))
+    # S = len(a_count)
+
+    # init t and a
     t = defaultdict(float)
-    for f, e in bitext:
-        for f_i in set(f):
-            for e_j in set(e).union({None}):
-                t[(f_i, e_j)] = 1.0 / V
-
-    # calculate the length of all distortions
-    a_count = set()
-    for f, e in bitext:
-        I, J = len(f), len(e)
-        for i in range(I):
-            for j in range(-1, J):
-                a_count.add((j, i, I, J))
-    S = len(a_count)
-
-    # init a uniformly
     a = defaultdict(float)
-    for j, i, I, J in a_count:
-        a[(j, i, I, J)] = 1.0 / S
-    print(V, S)
+    
+    count_e = defaultdict(float)
+    count_f = defaultdict(float)
+    count_ef = defaultdict(float)
+    for f, e in bitext:
+        I = len(f)
+        J = len(e)
+        for i, f_i in enumerate(f):
+            for j, e_j in enumerate(e):
+                count_f[f_i] += 1
+                count_e[e_j] += 1
+                count_ef[(f_i, e_j)] += 1
+                a[j, i, I, J] = 1.0 / (J+1)
+            a[-1, i, I, J] = 1.0 / (J+1)
+        t[f_i, None] = 1.0 / (I * J)
+    for f, e in count_ef:
+        t[(f, e)] = count_ef[(f, e)] / (count_e[e] * count_f[f])
+
+    V, S = 100000, 10000
     # traning
-    for k in range(args.num_iter):
-        sys.stderr.write("Starting Iteration %d ...\n" % k)
+    for T in range(args.num_iter):
+        sys.stderr.write("Starting Iteration %d ...\n" % T)
         expected_count_t_fe = defaultdict(float)
         expected_count_t_e = defaultdict(float)
         expected_count_a_fe = defaultdict(float)
         expected_count_a_e = defaultdict(float)
 
-        for f, e in bitext:
+        for k, (f, e) in enumerate(bitext):
+            if k % 100 == 0:
+                print('    ', k)
             I, J = len(f), len(e)
             for i in range(I):
                 # calculate the normalization term
