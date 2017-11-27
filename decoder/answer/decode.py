@@ -6,11 +6,9 @@ from collections import namedtuple
 
 
 def decode(f):
-    # The following code implements a monotone decoding
-    # algorithm (one that doesn't permute the target phrases).
-    # Hence all hypotheses in stacks[i] represent translations of
-    # the first i words of the input sentence. You should generalize
-    # this so that they can represent translations of *any* i words.
+    #fcostTable = FutureCostTable(tm, lm)
+    #fcostTable.computeTable(f)
+
     hypothesis = namedtuple("hypothesis", "logprob, bitstr, lm_state, predecessor, phrase")
     initial_hypothesis = hypothesis(0.0, '0'*len(f), lm.begin(), None, None)
     stacks = [{} for _ in f] + [{}]
@@ -33,7 +31,6 @@ def decode(f):
                             stacks[j][lm_state, bitstr, t] = new_hypothesis
     winner = max(stacks[-1].itervalues(), key=lambda h: h.logprob)
 
-    # keep it though i don't know what it does lol
     if opts.verbose:
         tm_logprob = extract_tm_logprob(winner)
         sys.stderr.write("LM = %f, TM = %f, Total = %f\n" %
@@ -43,18 +40,6 @@ def decode(f):
 
 
 # helper methods
-'''
-def phrase_generator(s, bitstr):
-    def generatePhrases(s, bitstr, i):
-        if i == len(s):
-            return [((), '')]
-        phrases = generatePhrases(s, bitstr, i+1)
-        if bitstr[i] == '1':
-            return [(p, '1'+b_str) for (p, b_str) in phrases]
-        else:
-            return [((s[i],) + p, '1'+b_str) for p, b_str in phrases] + [(p, '0'+b_str) for (p, b_str) in phrases]
-    return generatePhrases(s, bitstr, 0)
-'''
 def phrase_generator(s, bitstr):
     for i in range(len(s)):
         if bitstr[i] == '1':
@@ -64,6 +49,48 @@ def phrase_generator(s, bitstr):
                 break
             yield i, j, s[i:j+1], bitstr[:i]+'1'*(j-i+1)+bitstr[j+1:]
 
+class FutureCostTable(object):
+    def __init__(self, tm, lm):
+        self.tm = tm
+        self.lm = lm
+
+    def computeTable(self, s):
+        sys.stderr.write("\tcomputing FutureCostTable\n")
+        self.table = {}
+        for word_len in range(1, len(s)+1):
+            for i in range(0, len(s)-word_len+1):
+                j = i + word_len
+                max_prob = -sys.maxint
+                if s[i:j] in tm:
+                    for phrase in tm[s[i:j]]:
+                        max_prob = max(max_prob, self._score_phrase(phrase))
+                for k in range(i+1, j):
+                    max_prob = max(max_prob, self.table[i, k-1]+self.table[k, j-1])
+                self.table[i, j-1] = max_prob
+
+    def getFutureCost(self, bitstr):
+        i, j = 0, 0
+        logprob = 0
+        n = len(bitstr)
+        while j < n:
+            while i < n and bitstr[i] != '1':
+                i += 1
+            j = i
+            while j < n and bitstr[j] != '0':
+                j += 1
+            if i < n:
+                logprob += self.table[i, j-1]
+                i = j
+        return logprob
+            
+
+    def _score_phrase(self, phrase):
+        logprob = phrase.logprob
+        lm_state = tuple()
+        for word in phrase.english.split():
+            (lm_state, word_logprob) = self.lm.score(lm_state, word)
+            logprob += word_logprob
+        return logprob         
 
 
 def extract_english(h):
@@ -96,11 +123,3 @@ if __name__ == '__main__':
     for i, f in enumerate(french):
         sys.stderr.write("Decoding sentence %d \n" % i)
         print decode(f)
-
-    #print f
-    #print len(f)
-    #print len(phrase_generator(f, '0'*len(f)))
-    #for i, j, p, b in phrase_generator(('how', 'are', 'you'), '100'):
-    #    print i, j, p, b
-
-#    print phrase_generator(range(20), '0'*20);
