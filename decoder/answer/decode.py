@@ -82,7 +82,6 @@ class FutureCostTable(object):
                 logprob += self.table[i, j-1]
                 i = j
         return logprob
-            
 
     def _score_phrase(self, phrase):
         logprob = phrase.logprob
@@ -90,7 +89,7 @@ class FutureCostTable(object):
         for word in phrase.english.split():
             (lm_state, word_logprob) = self.lm.score(lm_state, word)
             logprob += word_logprob
-        return logprob         
+        return logprob
 
 
 def extract_english(h):
