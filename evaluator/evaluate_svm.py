@@ -79,7 +79,7 @@ def train():
     feat_vecs = map(lambda (f1, f2): [ f1[i]-f2[i] for i in range(len(f1))], feat_vecs[:len(true_labels)])
     assert len(feat_vecs) == len(true_labels)
 
-    lin_clf = svm.LinearSVC()
+    lin_clf = svm.LinearSVC(class_weight='balanced')
     sys.stderr.write('trainning svm\n')
     lin_clf.fit(feat_vecs, true_labels)
 
